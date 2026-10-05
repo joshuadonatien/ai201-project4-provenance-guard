@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Provenance Guard Dashboard</title>
+<style>
+  :root {
+    --bg: #f7f7f5; --card: #ffffff; --ink: #1d1d1f; --muted: #6b6b70; --line: #e4e4e0;
+    --ai: #c2410c; --unc: #a16207; --hum: #15803d; --accent: #1d4ed8;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #151517; --card: #1f1f22; --ink: #ececee; --muted: #9a9aa2; --line: #333338;
+            --ai: #fb923c; --unc: #facc15; --hum: #4ade80; --accent: #93c5fd; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; padding: 24px 16px 48px; background: var(--bg); color: var(--ink);
+         font: 14px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+  main { max-width: 1040px; margin: 0 auto; }
+  h1 { font-size: 22px; margin: 0 0 4px; }
+  h2 { font-size: 15px; margin: 0 0 12px; }
+  .sub { color: var(--muted); margin: 0 0 24px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-bottom: 16px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 16px; }
+  .k { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .04em; }
+  .v { font-size: 26px; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .note { color: var(--muted); font-size: 12px; }
+  .bar { display: flex; height: 22px; border-radius: 6px; overflow: hidden; background: var(--line); margin: 8px 0 12px; }
+  .bar span { display: block; height: 100%; }
+  .ai { background: var(--ai); } .uncertain { background: var(--unc); } .human { background: var(--hum); }
+  .legend { display: flex; flex-wrap: wrap; gap: 16px; }
+  .legend i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 6px; vertical-align: middle; }
+  .two { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 12px; margin-bottom: 16px; }
+  .scroll { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+  th { color: var(--muted); font-weight: 500; }
+  td.num { font-variant-numeric: tabular-nums; text-align: right; }
+  .pill { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: 12px; border: 1px solid var(--line); }
+  .empty { color: var(--muted); padding: 12px 0; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Provenance Guard</h1>
+  <p class="sub">Analytics across {{ s.total_submissions }} submission{{ '' if s.total_submissions == 1 else 's' }}. Generated {{ generated_at }}. JSON at <code>/stats</code>.</p>
+
+  <div class="grid">
+    <div class="card"><div class="k">Submissions</div><div class="v">{{ s.total_submissions }}</div></div>
+    <div class="card"><div class="k">Appeal rate</div><div class="v">{{ s.appeals.appeal_rate_percent }}%</div>
+      <div class="note">{{ s.appeals.filed }} filed, {{ s.appeals.open }} open</div></div>
+    <div class="card"><div class="k">Overturn rate</div><div class="v">{{ s.appeals.overturn_rate_percent }}%</div>
+      <div class="note">{{ s.appeals.overturned }} of {{ s.appeals.resolved }} resolved</div></div>
+    <div class="card"><div class="k">Signal disagreement</div><div class="v">{{ s.signal_disagreement.rate_percent }}%</div>
+      <div class="note">{{ s.signal_disagreement.count }} submissions; rising = detection drifting</div></div>
+    <div class="card"><div class="k">Avg confidence</div>
+      <div class="v">{{ '%.2f'|format(s.average_confidence) if s.average_confidence is not none else '—' }}</div>
+      <div class="note">0.5 = coin flip, 1.0 = certain</div></div>
+    <div class="card"><div class="k">Certificates issued</div><div class="v">{{ s.certificates.issued }}</div>
+      <div class="note">{{ s.certificates.denied }} denied</div></div>
+  </div>
+
+  <div class="two">
+    <div class="card">
+      <h2>Detection pattern (automated decisions)</h2>
+      {% set p = s.detection_pattern %}
+      {% if s.total_submissions %}
+      <div class="bar" role="img" aria-label="Likely AI {{ p.likely_ai.percent }}%, uncertain {{ p.uncertain.percent }}%, likely human {{ p.likely_human.percent }}%">
+        <span class="ai" style="width: {{ p.likely_ai.percent }}%"></span>
+        <span class="uncertain" style="width: {{ p.uncertain.percent }}%"></span>
+        <span class="human" style="width: {{ p.likely_human.percent }}%"></span>
+      </div>
+      {% else %}<div class="bar"></div>{% endif %}
+      <div class="legend">
+        <span><i class="ai"></i>Likely AI: {{ p.likely_ai.count }} ({{ p.likely_ai.percent }}%)</span>
+        <span><i class="uncertain"></i>Uncertain: {{ p.uncertain.count }} ({{ p.uncertain.percent }}%)</span>
+        <span><i class="human"></i>Likely human: {{ p.likely_human.count }} ({{ p.likely_human.percent }}%)</span>
+      </div>
+    </div>
+    <div class="card">
+      <h2>By content type</h2>
+      {% if s.by_content_type %}
+      <table>
+        <tr><th>Type</th><th style="text-align:right">Count</th></tr>
+        {% for t, n in s.by_content_type.items() %}<tr><td>{{ t }}</td><td class="num">{{ n }}</td></tr>{% endfor %}
+      </table>
+      {% else %}<div class="empty">No submissions yet.</div>{% endif %}
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Recent decisions</h2>
+    {% if recent %}
+    <div class="scroll">
+    <table>
+      <tr><th>Time (UTC)</th><th>Content</th><th>Creator</th><th>Type</th><th>Attribution</th>
+          <th style="text-align:right">AI score</th><th style="text-align:right">Confidence</th><th>Status</th><th>Label</th></tr>
+      {% for r in recent %}
+      <tr>
+        <td>{{ r.created_at[:19]|replace('T', ' ') }}</td>
+        <td title="{{ r.content_id }}">{{ (r.title or r.content_id[:8]) }}</td>
+        <td>{{ r.creator_id }}</td>
+        <td>{{ r.content_type }}</td>
+        <td>{{ r.attribution }}</td>
+        <td class="num">{{ '%.2f'|format(r.ai_score) }}</td>
+        <td class="num">{{ '%.2f'|format(r.confidence) }}</td>
+        <td><span class="pill">{{ r.status }}</span></td>
+        <td>{{ r.label.headline }}</td>
+      </tr>
+      {% endfor %}
+    </table>
+    </div>
+    {% else %}<div class="empty">No submissions yet.</div>{% endif %}
+  </div>
+</main>
+</body>
+</html>
