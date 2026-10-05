@@ -1,0 +1,23 @@
+
+
+===== Rate limit: 12 rapid submissions (limit 10/minute) =====
+request 1 -> HTTP 201
+request 2 -> HTTP 201
+request 3 -> HTTP 201
+request 4 -> HTTP 201
+request 5 -> HTTP 201
+request 6 -> HTTP 201
+request 7 -> HTTP 201
+request 8 -> HTTP 201
+request 9 -> HTTP 201
+request 10 -> HTTP 201
+request 11 -> HTTP 429
+request 12 -> HTTP 429
+
+
+===== Body of the last (rate-limited) response =====
+{
+    "error": "rate_limited",
+    "message": "Too many requests. Please wait before trying again.",
+    "limit": "10 per 1 minute"
+}
